@@ -13,6 +13,7 @@ const Project = () => {
     const [isAdmin, setIsAdmin] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
     const [showAddMemberModal, setShowAddMemberModal] = useState(false);
+    const [showEditMemberModal, setShowEditMemberModal] = useState(false);
     const [newMemberEmail, setNewMemberEmail] = useState('');
     const [newMemberRole, setNewMemberRole] = useState('member');
     const [menuAnchor, setMenuAnchor] = useState(null);
@@ -38,6 +39,9 @@ const Project = () => {
     }
     fetchProject
     useEffect(() => {
+        console.log('Original Members:', members);
+        console.log('Filtered Members:', members.filter(([email, role]) => role[0] != user.email));
+
         fetchProject();
         console.log(user.projects)
         if (projectData?.members) {
@@ -45,7 +49,7 @@ const Project = () => {
             setMembers(transformedMembers);
 
             // Check if current user is an admin
-            if (projectData.members["admin"][0] === user.email) {
+            if (projectData.members["admin"][0] === user.email || projectData.members["manager"] === user.email) {
                 setIsAdmin(true);
             }
         }
@@ -65,10 +69,65 @@ const Project = () => {
     };
 
     const handleCloseAddMemberDialog = () => {
-        setAddMemberDialogOpen(false);
+        setShowAddMemberModal(false);
         setNewMemberEmail('');
         setNewMemberRole('member');
+        setMenuAnchor(null);
+
     };
+
+    const handleDeleteUser = async (key, value) => {
+        try {
+            const updatedMembers = { ...projectData.members };
+            console.log(updatedMembers)
+
+            for (const memberKey in updatedMembers) {
+                if (memberKey === key && updatedMembers[memberKey] === value) {
+                    delete updatedMembers[memberKey];
+                    break;
+                }
+            }
+
+            const { data: userData, error: userError } = await supabase
+                .from("users")
+                .select("*")
+                .eq("email", value)
+                .single();
+
+
+            const updatedProjects = { ...userData.projects };
+
+            console.log(updatedProjects);
+
+            const newArray = updatedProjects.filter((i)=> i!=projectData.id)
+
+            console.log(updatedProjects);
+
+
+            const { data: updatedProjectData, error: updatedError } = await supabase
+                .from("users")
+                .update({ projects: updatedProjects })
+                .eq("email", value)
+                .single()
+
+            const { data: updatedData, error: updateError } = await supabase
+                .from("projects")
+                .update({ members: updatedMembers })
+                .eq("id", projectData.id);
+
+            if (updateError) {
+                console.error("Error updating members:", updateError.message);
+                return;
+            }
+
+            console.log("Updated project:", updatedData);
+            // window.location.reload();
+
+
+        } catch (error) {
+
+        }
+    }
 
     const handleAddMember = async () => {
         try {
@@ -133,23 +192,45 @@ const Project = () => {
                 </div>
                 <div className="d-flex flex-column align-items-start justify-content-center mt-5 pt-5">
                     <img src={landing} style={{ width: "100px" }} alt="Landing" />
-                    <h1>{name}</h1>
+                    <h1 style={{ color: "#009e99" }}>{name}</h1>
                     <p>{projectData.createdAt}</p>
                     <div className="">
                         Admin: {projectData.members["admin"]}
                     </div>
-                    <div className="mt-3">
+                    <div className="mt-5">
+                        <h4>Description</h4>
+                        <p>{projectData.desc}</p>
+                    </div>
+                    <div className="mt-2">
                         <div className="d-flex">
                             <i className="bi bi-people h4"></i>&nbsp;
                             <h4>Team ({members.length})</h4>
                         </div>
-                        <ul>
+
+                        <ul className='d-block d-sm-none' l>
                             {members.map(([role, emails]) => (
                                 <li key={role}>
                                     {Array.isArray(emails) ? emails.join(', ') : emails} - <strong>{role}</strong>
                                 </li>
                             ))}
                         </ul>
+                        <table style={{ width: "100%", borderCollapse: "collapse" }} className='d-none d-sm-block'>
+                            <thead>
+                                <tr>
+                                    <th style={{ border: "1px solid #ccc", padding: "10px", textAlign: "left" }}>Email</th>
+                                    <th style={{ border: "1px solid #ccc", padding: "10px", textAlign: "left" }}>Role</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {members.map(([email, role]) => (
+                                    <tr key={email}>
+                                        <td style={{ border: "1px solid #ccc", padding: "10px" }}>{role}</td>
+                                        <td style={{ border: "1px solid #ccc", padding: "10px" }}>{email}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+
                     </div>
                 </div>
 
@@ -176,12 +257,82 @@ const Project = () => {
                             onClose={handleCloseMenu}
                         >
                             <MenuItem onClick={() => setShowAddMemberModal(true)}>
-                                <i className='bi bi-people' style={{ marginRight: "8px" }} /> Edit Members
+                                <i className='bi bi-people' style={{ marginRight: "8px" }} /> Add Members
                             </MenuItem>
-                            {/* <MenuItem onClick={handleEditProjectDetails}>
-                                <i className='bi bi-gear' style={{ marginRight: "8px" }} /> Edit Project Details
-                            </MenuItem> */}
+                            <MenuItem onClick={() => setShowEditMemberModal(true)}>
+                                <i className='bi bi-pen' style={{ marginRight: "8px" }} /> Edit Members
+                            </MenuItem>
+
+                            {projectData.members["admin"][0] == user.email && (
+                                <MenuItem>
+                                    <i className='bi bi-gear' style={{ marginRight: "8px" }} /> Edit Project Details
+                                </MenuItem>
+                            )}
                         </Menu>
+
+                        {/* Edit Members */}
+                        {showEditMemberModal && (
+                            <div
+                                style={{
+                                    position: "fixed",
+                                    top: "50%",
+                                    left: "50%",
+                                    transform: "translate(-50%, -50%)",
+                                    backgroundColor: "#fff",
+                                    border: "1px solid #ccc",
+                                    borderRadius: "5px",
+                                    padding: "20px",
+                                    boxShadow: "0 2px 5px rgba(0,0,0,0.3)",
+                                    zIndex: 1000,
+                                }}
+                            >
+                                <h3>Edit Member</h3>
+                                <table style={{ width: "100%", borderCollapse: "collapse" }} className='d-none d-sm-block my-3'>
+                                    <thead>
+                                        <tr>
+                                            <th style={{ border: "1px solid #ccc", padding: "10px", textAlign: "left" }}>Email</th>
+                                            <th style={{ border: "1px solid #ccc", padding: "10px", textAlign: "left" }}>Role</th>
+                                            <th style={{ border: "1px solid #ccc", padding: "10px", textAlign: "left" }}>Edit</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {members
+                                            .filter(([email, role]) => role !== user.email && role != "admin" && email !== "admin") // Use AND (&&) to exclude both conditions
+                                            .map(([email, role]) => (
+                                                <tr key={email}>
+                                                    <td style={{ border: "1px solid #ccc", padding: "10px" }}>{role}</td>
+                                                    <td style={{ border: "1px solid #ccc", padding: "10px" }}>{email}</td>
+                                                    <td style={{ border: "1px solid #ccc", padding: "10px", color: "red" }}>
+                                                        <button onClick={() => handleDeleteUser(email, role)}>
+                                                            <i className="bi bi-trash h6"></i>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+
+
+
+
+                                    </tbody>
+                                </table>
+                                <div style={{ textAlign: "right" }}>
+                                    <button
+                                        onClick={() => setShowEditMemberModal(false)}
+                                        style={{
+                                            padding: "10px 20px",
+                                            backgroundColor: "#ccc",
+                                            color: "#000",
+                                            border: "none",
+                                            borderRadius: "3px",
+                                            marginRight: "10px",
+                                            cursor: "pointer",
+                                        }}
+                                    >
+                                        Close
+                                    </button>
+                                </div>
+                            </div>
+                        )}
 
 
                         {/* Add Member Modal */}
@@ -200,7 +351,7 @@ const Project = () => {
                                     zIndex: 1000,
                                 }}
                             >
-                                <h3>Add New Member</h3>
+                                <h3>Add Member</h3>
                                 <input
                                     type="email"
                                     placeholder="Email"
@@ -247,7 +398,7 @@ const Project = () => {
                                         onClick={handleAddMember}
                                         style={{
                                             padding: "10px 20px",
-                                            backgroundColor: "#007bff",
+                                            backgroundColor: "#009e99",
                                             color: "#fff",
                                             border: "none",
                                             borderRadius: "3px",

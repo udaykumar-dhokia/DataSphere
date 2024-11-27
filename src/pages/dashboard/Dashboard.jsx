@@ -16,6 +16,7 @@ const Dashboard = () => {
     const [error, setError] = useState('');
     const [openModal, setOpenModal] = useState(false);
     const [projectName, setProjectName] = useState('');
+    const [desc, setProjectDesc] = useState('');
     const [password, setPassword] = useState('');
     const [projectsArray, setProjectsArray] = useState([]);
 
@@ -24,8 +25,8 @@ const Dashboard = () => {
         navigate('/login');
     };
 
-    const handleCardClick = (name,project) => {
-        navigate(`/project/${name}/${sessionToken}`, { state: { projectData: project, user: userData }});
+    const handleCardClick = (name, project) => {
+        navigate(`/project/${name}/${sessionToken}`, { state: { projectData: project, user: userData } });
     };
 
     const fetchUserData = async () => {
@@ -85,42 +86,49 @@ const Dashboard = () => {
 
     const handleCreateProject = async () => {
         try {
-            const hashedPassword = await bcrypt.hash(password, 10);
-            const createdAt = new Date().toISOString().split('T')[0];
 
-            const { data: project, error: projectError } = await supabase
-                .from('projects')
-                .insert([{
-                    name: projectName,
-                    password: hashedPassword,
-                    createdAt: createdAt,
-                    admin: userData.id,
-                    members: { "admin": [userData.email] }
-                }])
-                .select('id')
-                .single();
+            if (projectName == "" || password == "" || desc == '') {
+                alert("Please fill all required fields.")
+            } else {
 
-            if (projectError) throw projectError;
+                const hashedPassword = await bcrypt.hash(password, 10);
+                const createdAt = new Date().toISOString().split('T')[0];
+
+                const { data: project, error: projectError } = await supabase
+                    .from('projects')
+                    .insert([{
+                        name: projectName,
+                        password: hashedPassword,
+                        createdAt: createdAt,
+                        admin: userData.id,
+                        members: { "admin": [userData.email] },
+                        desc: desc
+                    }])
+                    .select('id')
+                    .single();
+
+                if (projectError) throw projectError;
 
 
-            const projectsArray = userData.projects;
-            console.log(projectsArray);
-            const updatedProjects = [...projectsArray, project.id];
+                const projectsArray = userData.projects;
+                console.log(projectsArray);
+                const updatedProjects = [...projectsArray, project.id];
 
-            const { error: userUpdateError } = await supabase
-                .from('users')
-                .update({
-                    limit: userData.limit - 1,
-                    projects: updatedProjects,
-                })
-                .eq('id', userData.id);
+                const { error: userUpdateError } = await supabase
+                    .from('users')
+                    .update({
+                        limit: userData.limit - 1,
+                        projects: updatedProjects,
+                    })
+                    .eq('id', userData.id);
 
-            if (userUpdateError) throw userUpdateError;
+                if (userUpdateError) throw userUpdateError;
 
-            setOpenModal(false);
-            setProjectName('');
-            setPassword('');
-            fetchProjects();
+                setOpenModal(false);
+                setProjectName('');
+                setPassword('');
+                fetchProjects();
+            }
         } catch (err) {
             console.error("Error creating project:", err);
         }
@@ -155,16 +163,26 @@ const Dashboard = () => {
                             value={projectName}
                             onChange={(e) => setProjectName(e.target.value)}
                             style={{ marginBottom: '10px' }}
+                            required
                         />
-
-
+                        <TextField
+                            label="Description"
+                            fullWidth
+                            className='mt-2'
+                            value={desc}
+                            onChange={(e) => setProjectDesc(e.target.value)}
+                            style={{ marginBottom: '10px' }}
+                            required
+                        />
                         <TextField
                             label="Password"
                             type="password"
+                            className='mt-2'
                             fullWidth
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             style={{ marginBottom: '10px' }}
+                            required
                         />
 
 
@@ -185,25 +203,25 @@ const Dashboard = () => {
                         ) : (
                             projects.map((project) => (
                                 <div
-                                className="col-md-4 col-xl-3"
-                                key={project.id}
-                                onClick={() => handleCardClick(project.name, project)}
-                                style={{ cursor: 'pointer' }}
-                            >
-                                <div className="card bg-c-green order-card">
-                                    <div className="card-block">
-                                        <h6 className="m-b-20">{project.createdAt}</h6>
-                                        <h2 className="text-right">
-                                            <i className="fa fa-rocket f-left"></i>
-                                            <span>{project.name}</span>
-                                        </h2>
-                                        <p className="mt-4">
-                                            Admin
-                                            <span className="f-right">{project.members["admin"]}</span>
-                                        </p>
+                                    className="col-md-4 col-xl-3"
+                                    key={project.id}
+                                    onClick={() => handleCardClick(project.name, project)}
+                                    style={{ cursor: 'pointer' }}
+                                >
+                                    <div className="card bg-c-green order-card">
+                                        <div className="card-block">
+                                            <h6 className="m-b-20">{project.createdAt}</h6>
+                                            <h2 className="text-right">
+                                                <i className="fa fa-rocket f-left"></i>
+                                                <span>{project.name}</span>
+                                            </h2>
+                                            <p className="mt-4">
+                                                Admin
+                                                <span className="f-right">{project.members["admin"]}</span>
+                                            </p>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
                             ))
                         )}
                     </div>
