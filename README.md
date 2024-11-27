@@ -1,5 +1,3 @@
----
-
 # DataSphere
 
 **DataSphere** is a lightweight, React + Vite-based database management system (DBMS) with a Role-Based Access Control (RBAC) UI. It is designed to offer streamlined database management with three distinct user roles: **Admin**, **Manager**, and **Member**, each having tailored permissions and capabilities.
