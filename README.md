@@ -1,5 +1,3 @@
-Here’s a polished README file for your GitHub repository:
-
 ---
 
 # DataSphere
